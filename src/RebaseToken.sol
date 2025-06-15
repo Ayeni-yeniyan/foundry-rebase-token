@@ -19,7 +19,7 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
     );
 
     // Variables
-    uint256 private constant PRECISION_FACTOR = 1e27;
+    uint256 private constant PRECISION_FACTOR = 1e18;
 
     bytes32 private constant MINT_AND_BURN_ROLE =
         keccak256("MINT_AND_BURN_ROLE");
