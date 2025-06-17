@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+
 import {IRebaseToken} from "./interfaces/IRebaseToken.sol";
 
 contract Vault {
     // Errors
     error Vault__RedeemFailed();
     // Variable
+
     IRebaseToken private immutable i_rebaseToken;
 
     // Events
@@ -40,7 +42,7 @@ contract Vault {
         // Burn first
         i_rebaseToken.burn(msg.sender, _amount);
         // Transfer amount
-        (bool success, ) = payable(msg.sender).call{value: _amount}("");
+        (bool success,) = payable(msg.sender).call{value: _amount}("");
         if (!success) {
             revert Vault__RedeemFailed();
         }
