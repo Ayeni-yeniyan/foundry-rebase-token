@@ -15,4 +15,6 @@ interface IRebaseToken {
     function getUserInterestRate(address _user) external returns (uint256);
 
     function getInterestRate() external returns (uint256);
+
+    function grantMintAndBurnRole(address _account) external;
 }

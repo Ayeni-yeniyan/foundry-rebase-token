@@ -20,13 +20,15 @@ contract RebaseTokenTest is Test {
         rebaseToken = new RebaseToken();
         vault = new Vault(IRebaseToken(address(rebaseToken)));
         rebaseToken.grantMintAndBurnRole(address(vault));
-        (bool success,) = payable(address(this)).call{value: REWARD_POOL}("");
+        (bool success, ) = payable(address(this)).call{value: REWARD_POOL}("");
 
         vm.stopPrank();
     }
 
     function addRewardsToVault(uint256 rewardsToAdd) public {
-        (bool success,) = payable(address(vault)).call{value: rewardsToAdd}("");
+        (bool success, ) = payable(address(vault)).call{value: rewardsToAdd}(
+            ""
+        );
     }
 
     function testDepositLinear(uint256 amount) public {
@@ -48,7 +50,11 @@ contract RebaseTokenTest is Test {
         uint256 endBalance = rebaseToken.balanceOf(user);
         assertGt(endBalance, middleBalance);
 
-        assertApproxEqAbs(endBalance - middleBalance, middleBalance - startBalance, 1);
+        assertApproxEqAbs(
+            endBalance - middleBalance,
+            middleBalance - startBalance,
+            1
+        );
         vm.stopPrank();
     }
 
@@ -68,7 +74,10 @@ contract RebaseTokenTest is Test {
         vm.stopPrank();
     }
 
-    function testRedeemAfterSomeTimePassed(uint256 time, uint256 depositAmount) public {
+    function testRedeemAfterSomeTimePassed(
+        uint256 time,
+        uint256 depositAmount
+    ) public {
         time = bound(time, 1000, type(uint96).max);
         depositAmount = bound(depositAmount, 1e5, type(uint96).max);
         // deposit first
@@ -127,7 +136,9 @@ contract RebaseTokenTest is Test {
         assertEq(rebaseToken.getUserInterestRate(user2), 5e10);
     }
 
-    function testCannotSetInterestRateIfNotOwner(uint256 newInterestRate) public {
+    function testCannotSetInterestRateIfNotOwner(
+        uint256 newInterestRate
+    ) public {
         vm.prank(user);
         vm.expectRevert();
         rebaseToken.setInterestRate(newInterestRate);
@@ -135,8 +146,9 @@ contract RebaseTokenTest is Test {
 
     function testCannotCallBurnAndMint() public {
         vm.prank(user);
+        uint256 interestRate = rebaseToken.getInterestRate();
         vm.expectRevert();
-        rebaseToken.mint(user, 100);
+        rebaseToken.mint(user, 100, interestRate);
         vm.expectRevert();
         rebaseToken.burn(user, 100);
     }
@@ -157,7 +169,11 @@ contract RebaseTokenTest is Test {
     }
 
     function testInterestRateCanOnlyDecrease(uint256 newInterestRate) public {
-        newInterestRate = bound(newInterestRate, rebaseToken.getInterestRate() + 1, type(uint256).max);
+        newInterestRate = bound(
+            newInterestRate,
+            rebaseToken.getInterestRate() + 1,
+            type(uint256).max
+        );
         vm.prank(owner);
         vm.expectRevert();
         rebaseToken.setInterestRate(newInterestRate);
