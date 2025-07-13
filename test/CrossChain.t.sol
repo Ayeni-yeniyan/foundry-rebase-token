@@ -33,24 +33,24 @@ contract CrossChainTest is Test {
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork("sepolia");
-        arbitriumFork = vm.createSelectFork("arb-sepolia");
+        arbitriumFork = vm.createFork("arb-sepolia");
 
         cciplocalSimulatorFork = new CCIPLocalSimulatorFork();
         vm.makePersistent(address(cciplocalSimulatorFork));
-
         // Deploy and configure on sepolia
-        vm.startPrank(owner);
-        sepoliaRebaseToken = new RebaseToken();
-        vault = new Vault(IRebaseToken(address(sepoliaRebaseToken)));
         sepoliaNetworkDetails = cciplocalSimulatorFork.getNetworkDetails(
             block.chainid
         );
+
+        vm.startPrank(owner);
+        sepoliaRebaseToken = new RebaseToken();
         sepoliaRebaseTokenPool = new RebaseTokenPool(
             IERC20(address(sepoliaRebaseToken)),
             new address[](0),
             sepoliaNetworkDetails.rmnProxyAddress,
             sepoliaNetworkDetails.routerAddress
         );
+        vault = new Vault(IRebaseToken(address(sepoliaRebaseToken)));
         sepoliaRebaseToken.grantMintAndBurnRole(address(vault));
         sepoliaRebaseToken.grantMintAndBurnRole(
             address(sepoliaRebaseTokenPool)
@@ -58,8 +58,10 @@ contract CrossChainTest is Test {
         RegistryModuleOwnerCustom(
             sepoliaNetworkDetails.registryModuleOwnerCustomAddress
         ).registerAdminViaOwner(address(sepoliaRebaseToken));
+
         TokenAdminRegistry(sepoliaNetworkDetails.tokenAdminRegistryAddress)
             .acceptAdminRole(address(sepoliaRebaseToken));
+
         TokenAdminRegistry(sepoliaNetworkDetails.tokenAdminRegistryAddress)
             .setPool(
                 address(sepoliaRebaseToken),
@@ -100,14 +102,14 @@ contract CrossChainTest is Test {
             address(sepoliaRebaseTokenPool),
             arbitriumNetworkDetails.chainSelector,
             address(arbitriumRebaseTokenPool),
-            address(sepoliaRebaseToken)
+            address(arbitriumRebaseToken)
         );
         configureTokenPool(
             arbitriumFork,
             address(arbitriumRebaseTokenPool),
             sepoliaNetworkDetails.chainSelector,
             address(sepoliaRebaseTokenPool),
-            address(arbitriumRebaseToken)
+            address(sepoliaRebaseToken)
         );
     }
 
@@ -120,7 +122,25 @@ contract CrossChainTest is Test {
     ) public {
         console.log("ConfigureTokenPool called for fork", fork);
         vm.selectFork(fork);
-        vm.prank(owner);
+
+        // DEBUG: Check ownership
+        console.log("Pool owner:", TokenPool(localPool).owner());
+        console.log("Calling address:", owner);
+        console.log("Are they equal?", TokenPool(localPool).owner() == owner);
+
+        // DEBUG: Check addresses
+        console.log("Remote pool address:", remotePool);
+        console.log("Remote token address:", remoteTokenAddress);
+        console.log("Remote chain selector:", remoteChainSelector);
+
+        // DEBUG: Check if addresses are zero
+        require(remotePool != address(0), "Remote pool is zero address");
+        require(
+            remoteTokenAddress != address(0),
+            "Remote token is zero address"
+        );
+
+        vm.startPrank(owner);
         TokenPool.ChainUpdate[]
             memory chainsToAdd = new TokenPool.ChainUpdate[](1);
         chainsToAdd[0] = TokenPool.ChainUpdate({
@@ -140,7 +160,12 @@ contract CrossChainTest is Test {
             })
         });
 
+        console.log(
+            "ConfigureTokenPool applyChainUpdates bout to be called for fork",
+            fork
+        );
         TokenPool(localPool).applyChainUpdates(chainsToAdd);
+        vm.stopPrank();
         console.log("ConfigureTokenPool finished for fork", fork);
     }
 
@@ -167,7 +192,10 @@ contract CrossChainTest is Test {
             tokenAmounts: tokenAmounts,
             feeToken: localNetworkDetails.linkAddress,
             extraArgs: Client._argsToBytes(
-                Client.EVMExtraArgsV1({gasLimit: 100_000})
+                Client.EVMExtraArgsV2({
+                    gasLimit: 500_000,
+                    allowOutOfOrderExecution: false
+                })
             )
         });
         uint256 fee = IRouterClient(localNetworkDetails.routerAddress).getFee(
@@ -185,27 +213,26 @@ contract CrossChainTest is Test {
             localNetworkDetails.routerAddress,
             amountToBrigde
         );
-        uint256 localBalanceBefore = IERC20(address(localToken)).balanceOf(
-            user
-        );
+        uint256 localBalanceBefore = localToken.balanceOf(user);
         vm.prank((user));
         IRouterClient(localNetworkDetails.routerAddress).ccipSend(
             remoteNetworkDetails.chainSelector,
             evm2AnyMessage
         );
-        uint256 localBalanceAfter = IERC20(address(localToken)).balanceOf(user);
+        uint256 localBalanceAfter = localToken.balanceOf(user);
+
         assertEq(localBalanceBefore, localBalanceAfter + amountToBrigde);
         uint256 localUserInterestRate = localToken.getUserInterestRate(user);
 
         vm.selectFork(remoteFork);
         vm.warp(block.timestamp + 20 minutes);
-        uint256 remoteBalanceBefore = IERC20(address(remoteToken)).balanceOf(
-            user
-        );
+        uint256 remoteBalanceBefore = remoteToken.balanceOf(user);
+
+        vm.selectFork(localFork);
         cciplocalSimulatorFork.switchChainAndRouteMessage(remoteFork);
-        uint256 remoteBalanceAfter = IERC20(address(remoteToken)).balanceOf(
-            user
-        );
+
+        vm.selectFork(remoteFork);
+        uint256 remoteBalanceAfter = remoteToken.balanceOf(user);
         assertEq(localBalanceBefore, localBalanceAfter + amountToBrigde);
         uint256 remoteUserInterestRate = remoteToken.getUserInterestRate(user);
 
@@ -227,6 +254,18 @@ contract CrossChainTest is Test {
             arbitriumNetworkDetails,
             sepoliaRebaseToken,
             arbitriumRebaseToken
+        );
+
+        vm.selectFork(arbitriumFork);
+        vm.warp(block.timestamp);
+        brigdeTokens(
+            arbitriumRebaseToken.balanceOf(user),
+            arbitriumFork,
+            sepoliaFork,
+            arbitriumNetworkDetails,
+            sepoliaNetworkDetails,
+            arbitriumRebaseToken,
+            sepoliaRebaseToken
         );
     }
 }

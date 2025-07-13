@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 
 pragma solidity ^0.8.24;
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {Vault} from "../src/Vault.sol";
 import {RebaseToken} from "../src/RebaseToken.sol";
 import {RebaseTokenPool} from "../src/RebaseTokenPool.sol";
@@ -12,7 +12,9 @@ import {RegistryModuleOwnerCustom} from "@ccip/contracts/src/v0.8/ccip/tokenAdmi
 import {TokenAdminRegistry} from "@ccip/contracts/src/v0.8/ccip/tokenAdminRegistry/TokenAdminRegistry.sol";
 
 contract TokenAndPoolDeployer is Script {
-    function run() public returns (RebaseToken token, RebaseTokenPool pool) {
+    function run(
+        address vaultAddress
+    ) public returns (RebaseToken token, RebaseTokenPool pool) {
         CCIPLocalSimulatorFork ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
         Register.NetworkDetails memory networkDetails = ccipLocalSimulatorFork
             .getNetworkDetails(block.chainid);
@@ -25,17 +27,16 @@ contract TokenAndPoolDeployer is Script {
             networkDetails.routerAddress
         );
 
-        token.grantMintAndBurnRole(address(vault));
+        token.grantMintAndBurnRole(vaultAddress);
         RegistryModuleOwnerCustom(
             networkDetails.registryModuleOwnerCustomAddress
         ).registerAdminViaOwner(address(token));
         TokenAdminRegistry(networkDetails.tokenAdminRegistryAddress)
             .acceptAdminRole(address(token));
         TokenAdminRegistry(networkDetails.tokenAdminRegistryAddress).setPool(
-            address(localToken),
+            address(token),
             address(pool)
         );
-
         vm.stopBroadcast();
     }
 }

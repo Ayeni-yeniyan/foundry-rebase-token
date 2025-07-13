@@ -6,6 +6,7 @@ remappings = [
     "@openzeppelin/=lib/openzeppelin-contracts/",
     "@ccip/=lib/ccip/",
     "@chainlink-local/=lib/chainlink-local/",
+    "@forge-std=lib/forge-std/src",
 ]
 rpc_endpoints = { sepolia = "${SEPOLIA_RPC_URL}", arb-sepolia = "${ARBITRIUM_RPC_URL}" }
 
